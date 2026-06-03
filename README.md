@@ -53,7 +53,29 @@ onto the page. You'll get:
 You can search/filter, **copy** the list, or **export CSV**.
 
 > Uses the browser's built-in `DecompressionStream` to read the ZIP — no
-> internet connection or third-party library required.
+> internet connection or third-party library required. The ZIP is read with
+> byte-range slicing, so only the tiny followers/following files are loaded —
+> even a multi-GB export (with all your photos/videos) works without running
+> out of memory.
+
+### On iPhone / iPad (Safari or Chrome)
+
+The page works on a phone — it just needs a URL to open. Two options:
+
+1. **Host it (easiest):** enable **GitHub Pages** for this repo
+   (*Settings → Pages → Build from branch → `main` / root*). GitHub gives you a
+   link like `https://<you>.github.io/InstagramFollowUnFollow/`. Open that in
+   Safari/Chrome on your iPhone. It's still 100% client-side — your data never
+   leaves the phone, GitHub only serves the HTML.
+2. **Open the file locally:** AirDrop / email `index.html` to yourself, save it
+   to **Files**, and open it from there.
+
+Then:
+- Tap **“Tap to choose your instagram-….zip”**.
+- Choose **Browse**, find the `instagram-….zip` in **Files** (where the Instagram
+  app / email saved it), and select it. No need to unzip.
+- Requires **iOS/iPadOS 16.4+** (for the built-in ZIP decompression). On iPhone,
+  Chrome uses the same engine as Safari, so the version requirement is the same.
 
 ---
 

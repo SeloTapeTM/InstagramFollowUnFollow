@@ -111,14 +111,14 @@
 <div class="wrap">
   <header>
     <h1>Who doesn't follow you back?</h1>
-    <p>Drop your Instagram data export below. Everything runs in your browser — nothing is uploaded.</p>
+    <p>Pick your Instagram data export below. Everything runs in your browser — nothing is uploaded.</p>
   </header>
 
   <div class="card" id="uploadCard">
     <label class="drop" id="drop">
-      <input type="file" id="file" accept=".zip,.json,application/zip" />
-      <div>Drag &amp; drop your <strong>instagram-…​.zip</strong> here, or click to choose</div>
-      <div class="privacy">🔒 100% local. Your data never leaves this page.</div>
+      <input type="file" id="file" />
+      <div><strong>Tap to choose your instagram-…​.zip</strong><br><span class="privacy">(on a computer you can also drag &amp; drop)</span></div>
+      <div class="privacy" style="margin-top:10px">🔒 100% local. Your data never leaves this page.</div>
     </label>
     <div class="status" id="status"></div>
     <details class="help">
@@ -127,7 +127,8 @@
         <li>Open Instagram → <em>Settings → Accounts Center → Your information and permissions → Download your information</em>.</li>
         <li>Request a download. Choose <strong>Format: JSON</strong> (HTML also works), date range <em>All time</em>.</li>
         <li>You can limit it to <em>Followers and following</em> to get a smaller file faster.</li>
-        <li>When the email arrives, download the ZIP and drop it here. No need to unzip it.</li>
+        <li>When the email arrives, download the ZIP. On iPhone it saves to <em>Files</em> (or your Downloads).</li>
+        <li>Tap the box above, choose <em>Browse</em> → find the <code>instagram-….zip</code> in Files, and select it. No need to unzip — even a large export works, only the followers/following parts are read.</li>
       </ol>
     </details>
   </div>
@@ -161,47 +162,102 @@
 <script>
 "use strict";
 
-// ---------- Minimal in-browser ZIP reader (uses native DecompressionStream) ----------
-async function readZipEntries(arrayBuffer) {
-  const dv = new DataView(arrayBuffer);
-  const u8 = new Uint8Array(arrayBuffer);
-  const td = new TextDecoder();
+// ---------- In-browser ZIP reader, streaming via byte-range slicing ----------
+// Reads only the ZIP's central directory plus the specific entries we need, so
+// a multi-GB export is never loaded into memory. Handles ZIP64 (large exports
+// exceed the classic 4 GB / 65535-entry limits). Uses native DecompressionStream.
 
-  // Locate End Of Central Directory record (signature 0x06054b50), scanning from the end.
-  const EOCD_SIG = 0x06054b50;
+const MAX32 = 0xFFFFFFFF;
+
+async function sliceBytes(file, start, end) {
+  return new Uint8Array(await file.slice(start, end).arrayBuffer());
+}
+
+// Find where the central directory lives, following the ZIP64 records if present.
+async function locateCentralDirectory(file) {
+  const size = file.size;
+  const tailLen = Math.min(size, 70000); // 64 KB max EOCD comment + records
+  const tail = await sliceBytes(file, size - tailLen, size);
+  const dv = new DataView(tail.buffer);
+
   let eocd = -1;
-  for (let i = u8.length - 22; i >= 0; i--) {
-    if (dv.getUint32(i, true) === EOCD_SIG) { eocd = i; break; }
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
   }
-  if (eocd === -1) throw new Error("Not a valid ZIP file (no end-of-central-directory record).");
+  if (eocd === -1) throw new Error("This doesn't look like a ZIP file (no end-of-central-directory record).");
 
-  const entryCount = dv.getUint16(eocd + 10, true);
+  let count = dv.getUint16(eocd + 10, true);
+  let cdSize = dv.getUint32(eocd + 12, true);
   let cdOffset = dv.getUint32(eocd + 16, true);
 
+  // ZIP64: any maxed-out field means the real values live in the ZIP64 records.
+  if (count === 0xFFFF || cdSize === MAX32 || cdOffset === MAX32) {
+    const loc = eocd - 20;
+    if (loc >= 0 && dv.getUint32(loc, true) === 0x07064b50) {
+      const z64Off = Number(dv.getBigUint64(loc + 8, true));
+      const rec = await sliceBytes(file, z64Off, z64Off + 56);
+      const rdv = new DataView(rec.buffer);
+      if (rdv.getUint32(0, true) === 0x06064b50) {
+        count = Number(rdv.getBigUint64(32, true));
+        cdSize = Number(rdv.getBigUint64(40, true));
+        cdOffset = Number(rdv.getBigUint64(48, true));
+      }
+    }
+  }
+  return { count, cdSize, cdOffset };
+}
+
+// Read the ZIP64 extra field (id 0x0001) for the fields that were maxed out,
+// in their fixed order: uncompressed size, compressed size, local header offset.
+function readZip64Extra(dv, start, len, need) {
+  let p = start;
+  const end = start + len;
+  while (p + 4 <= end) {
+    const id = dv.getUint16(p, true);
+    const dsize = dv.getUint16(p + 2, true);
+    if (id === 0x0001) {
+      let dp = p + 4;
+      const out = {};
+      if (need.uncomp) { dp += 8; }
+      if (need.comp) { out.comp = Number(dv.getBigUint64(dp, true)); dp += 8; }
+      if (need.offset) { out.offset = Number(dv.getBigUint64(dp, true)); dp += 8; }
+      return out;
+    }
+    p += 4 + dsize;
+  }
+  return {};
+}
+
+async function readCentralDirectory(file) {
+  const { count, cdSize, cdOffset } = await locateCentralDirectory(file);
+  const u8 = await sliceBytes(file, cdOffset, cdOffset + cdSize);
+  const dv = new DataView(u8.buffer);
+  const td = new TextDecoder();
   const entries = [];
-  const CDH_SIG = 0x02014b50;
-  let p = cdOffset;
-  for (let n = 0; n < entryCount; n++) {
-    if (dv.getUint32(p, true) !== CDH_SIG) break;
+  let p = 0;
+  for (let n = 0; n < count && p + 46 <= u8.length; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
     const method = dv.getUint16(p + 10, true);
-    const compSize = dv.getUint32(p + 20, true);
+    let compSize = dv.getUint32(p + 20, true);
     const nameLen = dv.getUint16(p + 28, true);
     const extraLen = dv.getUint16(p + 30, true);
     const commentLen = dv.getUint16(p + 32, true);
-    const localOffset = dv.getUint32(p + 42, true);
+    let localOffset = dv.getUint32(p + 42, true);
     const name = td.decode(u8.subarray(p + 46, p + 46 + nameLen));
+
+    if (compSize === MAX32 || localOffset === MAX32) {
+      const ov = readZip64Extra(dv, p + 46 + nameLen, extraLen, {
+        uncomp: dv.getUint32(p + 24, true) === MAX32,
+        comp: compSize === MAX32,
+        offset: localOffset === MAX32,
+      });
+      if (ov.comp !== undefined) compSize = ov.comp;
+      if (ov.offset !== undefined) localOffset = ov.offset;
+    }
     entries.push({ name, method, compSize, localOffset });
     p += 46 + nameLen + extraLen + commentLen;
   }
-
-  // Resolve actual data start from each local header (extra field length can differ).
-  for (const e of entries) {
-    const lo = e.localOffset;
-    const nameLen = dv.getUint16(lo + 26, true);
-    const extraLen = dv.getUint16(lo + 28, true);
-    e.dataStart = lo + 30 + nameLen + extraLen;
-  }
-  return { entries, u8 };
+  return entries;
 }
 
 async function inflateRaw(bytes) {
@@ -210,11 +266,19 @@ async function inflateRaw(bytes) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-async function extractFile(zip, entry) {
-  const slice = zip.u8.subarray(entry.dataStart, entry.dataStart + entry.compSize);
+async function extractEntryText(file, entry) {
+  // The local header's name/extra lengths can differ from the central record,
+  // so read them fresh to find where the data actually starts.
+  const head = await sliceBytes(file, entry.localOffset, entry.localOffset + 30);
+  const hdv = new DataView(head.buffer);
+  if (hdv.getUint32(0, true) !== 0x04034b50) throw new Error("Bad local header for " + entry.name);
+  const nameLen = hdv.getUint16(26, true);
+  const extraLen = hdv.getUint16(28, true);
+  const dataStart = entry.localOffset + 30 + nameLen + extraLen;
+  const comp = await sliceBytes(file, dataStart, dataStart + entry.compSize);
   let out;
-  if (entry.method === 0) out = slice;              // stored
-  else if (entry.method === 8) out = await inflateRaw(slice); // deflate
+  if (entry.method === 0) out = comp;                  // stored
+  else if (entry.method === 8) out = await inflateRaw(comp); // deflate
   else throw new Error("Unsupported compression method " + entry.method + " in " + entry.name);
   return new TextDecoder().decode(out);
 }
@@ -269,38 +333,46 @@ function usersFromHtml(text) {
 
 function mergeInto(target, src) { for (const [k, v] of src) if (!target.has(k)) target.set(k, v); }
 
-async function processExport(arrayBuffer, isJsonFile, rawText) {
+async function processExport(file) {
   const followers = new Map();
   const following = new Map();
 
-  const classify = (name, parse) => {
+  const classify = (name, users) => {
     // Classify by basename only — the parent dir "followers_and_following"
     // contains both substrings and would misclassify the followers file.
     const base = name.split("/").pop().toLowerCase();
     if (!/follow/.test(base)) return;
-    const users = parse();
     if (/following/.test(base)) mergeInto(following, users);
     else if (/follower/.test(base)) mergeInto(followers, users);
   };
 
-  if (isJsonFile) {
-    // A single .json file was dropped — guess by content.
-    const users = usersFromJson(rawText);
-    // Try to detect which one by looking at the JSON keys.
-    if (/relationships_following|"following"/.test(rawText)) mergeInto(following, users);
-    else mergeInto(followers, users);
+  const name = file.name.toLowerCase();
+  const isSingleDoc = /\.(json|html?)$/.test(name);
+
+  if (isSingleDoc) {
+    // A single .json/.html file was chosen — guess which list by content.
+    const text = await file.text();
+    const users = /\.html?$/.test(name) ? usersFromHtml(text) : usersFromJson(text);
+    if (/following|relationships_following/.test(name) || /relationships_following/.test(text.slice(0, 500))) {
+      mergeInto(following, users);
+    } else {
+      mergeInto(followers, users);
+    }
   } else {
-    const zip = await readZipEntries(arrayBuffer);
-    const relevant = zip.entries.filter(e =>
-      /follow/i.test(e.name) && /\.(json|html)$/i.test(e.name)
+    // Treat as a ZIP (default for anything else, incl. iOS giving no extension).
+    setStatus("Reading ZIP index…");
+    const entries = await readCentralDirectory(file);
+    const relevant = entries.filter(e =>
+      /follow/i.test(e.name) && /\.(json|html?)$/i.test(e.name)
     );
     if (relevant.length === 0) {
       throw new Error("Couldn't find followers/following files in this ZIP. Make sure it's an Instagram data export.");
     }
+    setStatus("Extracting " + relevant.length + " file(s)…");
     for (const e of relevant) {
-      const text = await extractFile(zip, e);
-      const isHtml = /\.html$/i.test(e.name);
-      classify(e.name, () => isHtml ? usersFromHtml(text) : usersFromJson(text));
+      const text = await extractEntryText(file, e);
+      const isHtml = /\.html?$/i.test(e.name);
+      classify(e.name, isHtml ? usersFromHtml(text) : usersFromJson(text));
     }
   }
 
@@ -361,17 +433,18 @@ function currentRows() {
 
 async function handleFile(file) {
   try {
+    if (typeof DecompressionStream === "undefined") {
+      throw new Error("Your browser is too old to read ZIP files here. Update iOS/Safari (16.4+) or Chrome, or unzip and drop following.json.");
+    }
     setStatus("Reading " + file.name + " …");
-    const buf = await file.arrayBuffer();
-    const isJson = /\.json$/i.test(file.name);
-    const rawText = isJson ? new TextDecoder().decode(new Uint8Array(buf)) : null;
-    const { followers, following } = await processExport(buf, isJson, rawText);
+    const { followers, following } = await processExport(file);
     if (following.size === 0 && followers.size === 0) {
       throw new Error("No followers/following data found in this file.");
     }
     compute(followers, following);
     render();
     $("#results").classList.remove("hidden");
+    $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
     setStatus("Done. Parsed " + following.size + " following and " + followers.size + " followers.");
   } catch (err) {
     console.error(err);
