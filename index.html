@@ -220,14 +220,24 @@ async function extractFile(zip, entry) {
 }
 
 // ---------- Instagram JSON parsing ----------
-// Recursively collect every {value, href} pair found under any "string_list_data".
+// Pull a username out of an instagram.com/<user> or .../_u/<user> URL.
+function slugFromHref(href) {
+  const m = (href || "").match(/instagram\.com\/(?:_u\/)?([^\/?#]+)/i);
+  try { return m ? decodeURIComponent(m[1]).trim() : ""; } catch { return m ? m[1].trim() : ""; }
+}
+
+// Recursively collect {username, href} from any "string_list_data" block.
+// Handles both shapes: followers entries carry a "value"; following entries
+// have no "value" — the username is the entry's "title" and the href is
+// .../_u/<username>.
 function collectUsers(node, out) {
   if (!node || typeof node !== "object") return;
   if (Array.isArray(node)) { for (const x of node) collectUsers(x, out); return; }
   if (Array.isArray(node.string_list_data)) {
+    const title = (node.title || "").trim();
     for (const s of node.string_list_data) {
-      const value = (s.value || "").trim();
-      if (value) out.set(value.toLowerCase(), { username: value, href: s.href || ("https://www.instagram.com/" + value) });
+      const username = ((s.value || "").trim()) || title || slugFromHref(s.href);
+      if (username) out.set(username.toLowerCase(), { username, href: "https://www.instagram.com/" + username });
     }
   }
   for (const k of Object.keys(node)) {

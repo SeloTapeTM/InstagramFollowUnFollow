@@ -16,25 +16,40 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
 import zipfile
 from html.parser import HTMLParser
+from urllib.parse import unquote
+
+
+def _slug_from_href(href):
+    """Extract the username from an instagram.com/<user> or .../_u/<user> URL."""
+    m = re.search(r"instagram\.com/(?:_u/)?([^/?#]+)", href or "", re.I)
+    return unquote(m.group(1)).strip() if m else ""
 
 
 def _collect_from_json_node(node, out):
-    """Recursively gather {username: href} from any 'string_list_data' blocks."""
+    """Recursively gather {username: href} from any 'string_list_data' blocks.
+
+    Handles both export shapes:
+      * followers: string_list_data entries carry a "value" (the username)
+      * following: no "value" — username is the entry's "title", and the href
+        is .../_u/<username>
+    """
     if isinstance(node, list):
         for item in node:
             _collect_from_json_node(item, out)
     elif isinstance(node, dict):
         sld = node.get("string_list_data")
         if isinstance(sld, list):
+            title = (node.get("title") or "").strip()
             for s in sld:
-                value = (s.get("value") or "").strip()
-                if value:
-                    out[value.lower()] = (
-                        value,
-                        s.get("href") or f"https://www.instagram.com/{value}",
+                username = (s.get("value") or "").strip() or title or _slug_from_href(s.get("href"))
+                if username:
+                    out[username.lower()] = (
+                        username,
+                        f"https://www.instagram.com/{username}",
                     )
         for key, child in node.items():
             if key != "string_list_data":
