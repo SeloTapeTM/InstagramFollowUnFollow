@@ -50,7 +50,19 @@ onto the page. You'll get:
 - **Fans** — accounts who follow you but you don't follow back.
 - **Mutual** — follow each other.
 
-You can search/filter, **copy** the list, or **export CSV**.
+Each row also shows **when the follow happened** (e.g. "you followed · 3y ago"),
+taken from the export's own timestamp — handy for spotting old one-way follows
+of big accounts you're happy to just be a fan of.
+
+You can search/filter, **copy** the list, or **export CSV** (the CSV includes
+the follow date). The site has a **dark / light theme** that follows your device
+and can be toggled with the 🌙/☀️ button.
+
+> Note: Instagram's export does **not** include follower counts for these
+> accounts (only usernames, profile links, and follow dates), so the tool can't
+> show how many followers each account has without contacting Instagram — which
+> would break the "nothing leaves your browser" guarantee. Tap a username to
+> open their profile if you want to check.
 
 > Uses the browser's built-in `DecompressionStream` to read the ZIP — no
 > internet connection or third-party library required. The ZIP is read with
@@ -120,6 +132,16 @@ Instagram stores your relationships in JSON like:
 ] }
 ```
 
-Both tools extract every `string_list_data[].value` from the followers and
-following files, then compute the set difference
+Both tools extract every username from the followers and following files
+(handling the two different shapes Instagram uses — `value` for followers,
+`title` + `_u/` links for following), then compute the set difference
 `following − followers` = accounts that don't follow you back.
+
+---
+
+## Credits & license
+
+Made by **[Omer Daniel](https://github.com/SeloTapeTM)**.
+
+Released under the [MIT License](LICENSE) — free to use, modify, and share with
+attribution.

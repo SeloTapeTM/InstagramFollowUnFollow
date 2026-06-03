@@ -3,18 +3,39 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light dark" />
 <title>Instagram — Who Doesn't Follow You Back</title>
 <style>
   :root {
     --bg: #fafafa;
     --card: #ffffff;
     --border: #dbdbdb;
+    --hair: #efefef;
     --text: #262626;
     --muted: #8e8e8e;
     --accent: #0095f6;
     --accent-hover: #1877f2;
     --danger: #ed4956;
+    --btn-bg: #efefef;
+    --btn-bg-hover: #e2e2e2;
+    --code-bg: #efefef;
+    --drop-hover: #f0f8ff;
     --radius: 12px;
+  }
+  /* Dark palette, shared by system-preference and the manual toggle. */
+  :root[data-theme="dark"],
+  :root.dark { color-scheme: dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #000000; --card: #121212; --border: #363636; --hair: #262626;
+      --text: #fafafa; --muted: #a8a8a8; --accent: #0095f6; --accent-hover: #4cb5f9;
+      --btn-bg: #1f1f1f; --btn-bg-hover: #2a2a2a; --code-bg: #1f1f1f; --drop-hover: #11233a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #000000; --card: #121212; --border: #363636; --hair: #262626;
+    --text: #fafafa; --muted: #a8a8a8; --accent: #0095f6; --accent-hover: #4cb5f9;
+    --btn-bg: #1f1f1f; --btn-bg-hover: #2a2a2a; --code-bg: #1f1f1f; --drop-hover: #11233a;
   }
   * { box-sizing: border-box; }
   body {
@@ -24,9 +45,17 @@
     color: var(--text);
     line-height: 1.5;
   }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 80px; }
-  header h1 { font-size: 1.6rem; margin: 0 0 6px; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 40px; }
+  header { position: relative; }
+  header h1 { font-size: 1.6rem; margin: 0 56px 6px 0; }
   header p { color: var(--muted); margin: 0 0 24px; }
+  .theme-toggle {
+    position: absolute; top: -4px; right: 0;
+    width: 40px; height: 40px; border-radius: 999px;
+    background: var(--btn-bg); border: 1px solid var(--border);
+    font-size: 1.15rem; line-height: 1; cursor: pointer; color: var(--text);
+  }
+  .theme-toggle:hover { background: var(--btn-bg-hover); }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -43,7 +72,7 @@
     cursor: pointer;
     transition: border-color .15s, background .15s;
   }
-  .drop.dragover { border-color: var(--accent); background: #f0f8ff; }
+  .drop.dragover { border-color: var(--accent); background: var(--drop-hover); }
   .drop strong { color: var(--accent); }
   .drop input { display: none; }
   .btn {
@@ -57,8 +86,8 @@
     cursor: pointer;
   }
   .btn:hover { background: var(--accent-hover); }
-  .btn.secondary { background: #efefef; color: var(--text); }
-  .btn.secondary:hover { background: #e2e2e2; }
+  .btn.secondary { background: var(--btn-bg); color: var(--text); }
+  .btn.secondary:hover { background: var(--btn-bg-hover); }
   .status { color: var(--muted); font-size: .9rem; margin-top: 14px; min-height: 1.2em; }
   .status.error { color: var(--danger); }
   .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -82,35 +111,46 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: .95rem;
+    background: var(--card);
+    color: var(--text);
   }
   ul.list { list-style: none; padding: 0; margin: 0; }
   ul.list li {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 10px 4px;
-    border-bottom: 1px solid #efefef;
+    border-bottom: 1px solid var(--hair);
   }
   ul.list li:last-child { border-bottom: 0; }
-  ul.list a { color: var(--text); text-decoration: none; font-weight: 600; }
-  ul.list a:hover { color: var(--accent); }
-  .open-link { color: var(--accent); font-size: .85rem; text-decoration: none; }
+  ul.list .u { min-width: 0; }
+  ul.list a.name { color: var(--text); text-decoration: none; font-weight: 600; }
+  ul.list a.name:hover { color: var(--accent); }
+  ul.list .meta { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+  .open-link { color: var(--accent); font-size: .85rem; text-decoration: none; white-space: nowrap; }
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
   .tab {
     padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px;
     background: var(--card); cursor: pointer; font-size: .88rem; font-weight: 600;
   }
-  .tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .hidden { display: none !important; }
   .empty { color: var(--muted); text-align: center; padding: 30px 0; }
   .privacy { font-size: .82rem; color: var(--muted); margin-top: 8px; }
   details.help { margin-top: 14px; }
   details.help summary { cursor: pointer; color: var(--accent); font-weight: 600; }
   details.help ol { padding-left: 20px; }
-  code { background: #efefef; padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+  .site-footer {
+    margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--hair);
+    text-align: center; color: var(--muted); font-size: .85rem; line-height: 1.8;
+  }
+  .site-footer a { color: var(--accent); text-decoration: none; }
+  .site-footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
+    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark / light theme" title="Toggle theme">🌙</button>
     <h1>Who doesn't follow you back?</h1>
     <p>Pick your Instagram data export below. Everything runs in your browser — nothing is uploaded.</p>
   </header>
@@ -158,6 +198,13 @@
       <div class="empty hidden" id="empty">Nothing here 🎉</div>
     </div>
   </div>
+
+  <footer class="site-footer">
+    Made by <a href="https://github.com/SeloTapeTM" target="_blank" rel="noopener noreferrer">Omer Daniel</a>
+    · <a href="https://github.com/SeloTapeTM/InstagramFollowUnFollow" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+    · <a href="https://github.com/SeloTapeTM/InstagramFollowUnFollow/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+    <br>🔒 Runs entirely in your browser — your data is never uploaded.
+  </footer>
 </div>
 
 <script>
@@ -302,7 +349,8 @@ function collectUsers(node, out) {
     const title = (node.title || "").trim();
     for (const s of node.string_list_data) {
       const username = ((s.value || "").trim()) || title || slugFromHref(s.href);
-      if (username) out.set(username.toLowerCase(), { username, href: "https://www.instagram.com/" + username });
+      // s.timestamp = when the follow happened (you→them for following, them→you for followers).
+      if (username) out.set(username.toLowerCase(), { username, href: "https://www.instagram.com/" + username, ts: s.timestamp || 0 });
     }
   }
   for (const k of Object.keys(node)) {
@@ -408,6 +456,32 @@ function compute(followers, following) {
   $("#cFans").textContent = fans.length;
 }
 
+// Compact "time since" label, e.g. "3y ago", "5mo ago", "12d ago".
+function agoLabel(ts) {
+  if (!ts) return "";
+  const secs = Date.now() / 1000 - ts;
+  if (secs < 0) return "";
+  const days = secs / 86400;
+  if (days < 1) return "today";
+  if (days < 30) return Math.floor(days) + "d ago";
+  if (days < 365) return Math.max(1, Math.floor(days / 30)) + "mo ago";
+  return Math.max(1, Math.floor(days / 365)) + "y ago";
+}
+
+// Full date for the hover tooltip, e.g. "12 Mar 2021".
+function fullDate(ts) {
+  if (!ts) return "";
+  try { return new Date(ts * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }); }
+  catch { return ""; }
+}
+
+function metaText(u) {
+  const ago = agoLabel(u.ts);
+  if (!ago) return "";
+  // For followers/fans the timestamp is when they followed you; otherwise it's when you followed them.
+  return (currentTab === "fans" ? "followed you · " : "you followed · ") + ago;
+}
+
 function render() {
   const list = $("#list");
   const q = $("#search").value.trim().toLowerCase();
@@ -416,13 +490,28 @@ function render() {
   $("#empty").classList.toggle("hidden", rows.length > 0);
   for (const u of rows) {
     const li = document.createElement("li");
+
+    const wrap = document.createElement("div");
+    wrap.className = "u";
     const a = document.createElement("a");
+    a.className = "name";
     a.href = u.href; a.target = "_blank"; a.rel = "noopener noreferrer";
     a.textContent = "@" + u.username;
+    wrap.appendChild(a);
+    const meta = metaText(u);
+    if (meta) {
+      const m = document.createElement("div");
+      m.className = "meta";
+      m.textContent = meta;
+      m.title = fullDate(u.ts);
+      wrap.appendChild(m);
+    }
+
     const open = document.createElement("a");
     open.href = u.href; open.target = "_blank"; open.rel = "noopener noreferrer";
     open.className = "open-link"; open.textContent = "Open ↗";
-    li.appendChild(a); li.appendChild(open);
+
+    li.appendChild(wrap); li.appendChild(open);
     list.appendChild(li);
   }
 }
@@ -478,7 +567,10 @@ $("#copyBtn").addEventListener("click", async () => {
 
 $("#csvBtn").addEventListener("click", () => {
   const rows = currentRows();
-  const csv = "username,profile_url\n" + rows.map(u => `${u.username},${u.href}`).join("\n");
+  const dateCol = currentTab === "fans" ? "followed_you_on" : "you_followed_on";
+  const iso = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : "";
+  const csv = `username,profile_url,${dateCol}\n` +
+    rows.map(u => `${u.username},${u.href},${iso(u.ts)}`).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -492,6 +584,40 @@ $("#resetBtn").addEventListener("click", () => {
   fileInput.value = "";
   setStatus("");
 });
+
+// ---------- Theme: follow the system by default, with a manual toggle ----------
+const root = document.documentElement;
+const themeBtn = $("#themeToggle");
+
+function effectiveTheme() {
+  const explicit = root.getAttribute("data-theme");
+  if (explicit === "dark" || explicit === "light") return explicit;
+  return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+function updateThemeIcon() {
+  // Show the icon for the theme you'd switch TO.
+  themeBtn.textContent = effectiveTheme() === "dark" ? "☀️" : "🌙";
+}
+function applySavedTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem("theme"); } catch {}
+  if (saved === "dark" || saved === "light") root.setAttribute("data-theme", saved);
+  updateThemeIcon();
+}
+themeBtn.addEventListener("click", () => {
+  const next = effectiveTheme() === "dark" ? "light" : "dark";
+  root.setAttribute("data-theme", next);
+  try { localStorage.setItem("theme", next); } catch {}
+  updateThemeIcon();
+});
+// If the user hasn't chosen manually, track system changes live.
+if (window.matchMedia) {
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    let saved = null; try { saved = localStorage.getItem("theme"); } catch {}
+    if (saved !== "dark" && saved !== "light") updateThemeIcon();
+  });
+}
+applySavedTheme();
 </script>
 </body>
 </html>
