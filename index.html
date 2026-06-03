@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Instagram — Who Doesn't Follow You Back</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --card: #ffffff;
+    --border: #dbdbdb;
+    --text: #262626;
+    --muted: #8e8e8e;
+    --accent: #0095f6;
+    --accent-hover: #1877f2;
+    --danger: #ed4956;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 20px 80px; }
+  header h1 { font-size: 1.6rem; margin: 0 0 6px; }
+  header p { color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .drop {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 44px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.dragover { border-color: var(--accent); background: #f0f8ff; }
+  .drop strong { color: var(--accent); }
+  .drop input { display: none; }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: .95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn.secondary { background: #efefef; color: var(--text); }
+  .btn.secondary:hover { background: #e2e2e2; }
+  .status { color: var(--muted); font-size: .9rem; margin-top: 14px; min-height: 1.2em; }
+  .status.error { color: var(--danger); }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat {
+    flex: 1 1 140px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat .num { font-size: 1.8rem; font-weight: 700; }
+  .stat .lbl { color: var(--muted); font-size: .82rem; }
+  .toolbar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .toolbar input[type=search] {
+    flex: 1 1 220px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: .95rem;
+  }
+  ul.list { list-style: none; padding: 0; margin: 0; }
+  ul.list li {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 4px;
+    border-bottom: 1px solid #efefef;
+  }
+  ul.list li:last-child { border-bottom: 0; }
+  ul.list a { color: var(--text); text-decoration: none; font-weight: 600; }
+  ul.list a:hover { color: var(--accent); }
+  .open-link { color: var(--accent); font-size: .85rem; text-decoration: none; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab {
+    padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--card); cursor: pointer; font-size: .88rem; font-weight: 600;
+  }
+  .tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .hidden { display: none !important; }
+  .empty { color: var(--muted); text-align: center; padding: 30px 0; }
+  .privacy { font-size: .82rem; color: var(--muted); margin-top: 8px; }
+  details.help { margin-top: 14px; }
+  details.help summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+  details.help ol { padding-left: 20px; }
+  code { background: #efefef; padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Who doesn't follow you back?</h1>
+    <p>Pick your Instagram data export below. Everything runs in your browser — nothing is uploaded.</p>
+  </header>
+
+  <div class="card" id="uploadCard">
+    <label class="drop" id="drop">
+      <input type="file" id="file" />
+      <div><strong>Tap to choose your instagram-…​.zip</strong><br><span class="privacy">(on a computer you can also drag &amp; drop)</span></div>
+      <div class="privacy" style="margin-top:10px">🔒 100% local. Your data never leaves this page.</div>
+    </label>
+    <div class="status" id="status"></div>
+    <details class="help">
+      <summary>How do I get my Instagram export?</summary>
+      <ol>
+        <li>Open Instagram → <em>Settings → Accounts Center → Your information and permissions → Download your information</em>.</li>
+        <li>Request a download. Choose <strong>Format: JSON</strong> (HTML also works), date range <em>All time</em>.</li>
+        <li>You can limit it to <em>Followers and following</em> to get a smaller file faster.</li>
+        <li>When the email arrives, download the ZIP. On iPhone it saves to <em>Files</em> (or your Downloads).</li>
+        <li>Tap the box above, choose <em>Browse</em> → find the <code>instagram-….zip</code> in Files, and select it. No need to unzip — even a large export works, only the followers/following parts are read.</li>
+      </ol>
+    </details>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="stats">
+      <div class="stat"><div class="num" id="cFollowing">0</div><div class="lbl">Following</div></div>
+      <div class="stat"><div class="num" id="cFollowers">0</div><div class="lbl">Followers</div></div>
+      <div class="stat"><div class="num" id="cNotBack">0</div><div class="lbl">Don't follow you back</div></div>
+      <div class="stat"><div class="num" id="cFans">0</div><div class="lbl">You don't follow back</div></div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" data-tab="notback">Not following you back</div>
+        <div class="tab" data-tab="fans">Fans (you don't follow)</div>
+        <div class="tab" data-tab="mutual">Mutual</div>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Filter usernames…" />
+        <button class="btn secondary" id="copyBtn">Copy list</button>
+        <button class="btn secondary" id="csvBtn">Export CSV</button>
+        <button class="btn secondary" id="resetBtn">Load another file</button>
+      </div>
+      <ul class="list" id="list"></ul>
+      <div class="empty hidden" id="empty">Nothing here 🎉</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------- In-browser ZIP reader, streaming via byte-range slicing ----------
+// Reads only the ZIP's central directory plus the specific entries we need, so
+// a multi-GB export is never loaded into memory. Handles ZIP64 (large exports
+// exceed the classic 4 GB / 65535-entry limits). Uses native DecompressionStream.
+
+const MAX32 = 0xFFFFFFFF;
+
+async function sliceBytes(file, start, end) {
+  return new Uint8Array(await file.slice(start, end).arrayBuffer());
+}
+
+// Find where the central directory lives, following the ZIP64 records if present.
+async function locateCentralDirectory(file) {
+  const size = file.size;
+  const tailLen = Math.min(size, 70000); // 64 KB max EOCD comment + records
+  const tail = await sliceBytes(file, size - tailLen, size);
+  const dv = new DataView(tail.buffer);
+
+  let eocd = -1;
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error("This doesn't look like a ZIP file (no end-of-central-directory record).");
+
+  let count = dv.getUint16(eocd + 10, true);
+  let cdSize = dv.getUint32(eocd + 12, true);
+  let cdOffset = dv.getUint32(eocd + 16, true);
+
+  // ZIP64: any maxed-out field means the real values live in the ZIP64 records.
+  if (count === 0xFFFF || cdSize === MAX32 || cdOffset === MAX32) {
+    const loc = eocd - 20;
+    if (loc >= 0 && dv.getUint32(loc, true) === 0x07064b50) {
+      const z64Off = Number(dv.getBigUint64(loc + 8, true));
+      const rec = await sliceBytes(file, z64Off, z64Off + 56);
+      const rdv = new DataView(rec.buffer);
+      if (rdv.getUint32(0, true) === 0x06064b50) {
+        count = Number(rdv.getBigUint64(32, true));
+        cdSize = Number(rdv.getBigUint64(40, true));
+        cdOffset = Number(rdv.getBigUint64(48, true));
+      }
+    }
+  }
+  return { count, cdSize, cdOffset };
+}
+
+// Read the ZIP64 extra field (id 0x0001) for the fields that were maxed out,
+// in their fixed order: uncompressed size, compressed size, local header offset.
+function readZip64Extra(dv, start, len, need) {
+  let p = start;
+  const end = start + len;
+  while (p + 4 <= end) {
+    const id = dv.getUint16(p, true);
+    const dsize = dv.getUint16(p + 2, true);
+    if (id === 0x0001) {
+      let dp = p + 4;
+      const out = {};
+      if (need.uncomp) { dp += 8; }
+      if (need.comp) { out.comp = Number(dv.getBigUint64(dp, true)); dp += 8; }
+      if (need.offset) { out.offset = Number(dv.getBigUint64(dp, true)); dp += 8; }
+      return out;
+    }
+    p += 4 + dsize;
+  }
+  return {};
+}
+
+async function readCentralDirectory(file) {
+  const { count, cdSize, cdOffset } = await locateCentralDirectory(file);
+  const u8 = await sliceBytes(file, cdOffset, cdOffset + cdSize);
+  const dv = new DataView(u8.buffer);
+  const td = new TextDecoder();
+  const entries = [];
+  let p = 0;
+  for (let n = 0; n < count && p + 46 <= u8.length; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    let compSize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    let localOffset = dv.getUint32(p + 42, true);
+    const name = td.decode(u8.subarray(p + 46, p + 46 + nameLen));
+
+    if (compSize === MAX32 || localOffset === MAX32) {
+      const ov = readZip64Extra(dv, p + 46 + nameLen, extraLen, {
+        uncomp: dv.getUint32(p + 24, true) === MAX32,
+        comp: compSize === MAX32,
+        offset: localOffset === MAX32,
+      });
+      if (ov.comp !== undefined) compSize = ov.comp;
+      if (ov.offset !== undefined) localOffset = ov.offset;
+    }
+    entries.push({ name, method, compSize, localOffset });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+
+async function inflateRaw(bytes) {
+  const ds = new DecompressionStream("deflate-raw");
+  const stream = new Blob([bytes]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function extractEntryText(file, entry) {
+  // The local header's name/extra lengths can differ from the central record,
+  // so read them fresh to find where the data actually starts.
+  const head = await sliceBytes(file, entry.localOffset, entry.localOffset + 30);
+  const hdv = new DataView(head.buffer);
+  if (hdv.getUint32(0, true) !== 0x04034b50) throw new Error("Bad local header for " + entry.name);
+  const nameLen = hdv.getUint16(26, true);
+  const extraLen = hdv.getUint16(28, true);
+  const dataStart = entry.localOffset + 30 + nameLen + extraLen;
+  const comp = await sliceBytes(file, dataStart, dataStart + entry.compSize);
+  let out;
+  if (entry.method === 0) out = comp;                  // stored
+  else if (entry.method === 8) out = await inflateRaw(comp); // deflate
+  else throw new Error("Unsupported compression method " + entry.method + " in " + entry.name);
+  return new TextDecoder().decode(out);
+}
+
+// ---------- Instagram JSON parsing ----------
+// Pull a username out of an instagram.com/<user> or .../_u/<user> URL.
+function slugFromHref(href) {
+  const m = (href || "").match(/instagram\.com\/(?:_u\/)?([^\/?#]+)/i);
+  try { return m ? decodeURIComponent(m[1]).trim() : ""; } catch { return m ? m[1].trim() : ""; }
+}
+
+// Recursively collect {username, href} from any "string_list_data" block.
+// Handles both shapes: followers entries carry a "value"; following entries
+// have no "value" — the username is the entry's "title" and the href is
+// .../_u/<username>.
+function collectUsers(node, out) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) { for (const x of node) collectUsers(x, out); return; }
+  if (Array.isArray(node.string_list_data)) {
+    const title = (node.title || "").trim();
+    for (const s of node.string_list_data) {
+      const username = ((s.value || "").trim()) || title || slugFromHref(s.href);
+      if (username) out.set(username.toLowerCase(), { username, href: "https://www.instagram.com/" + username });
+    }
+  }
+  for (const k of Object.keys(node)) {
+    if (k === "string_list_data") continue;
+    collectUsers(node[k], out);
+  }
+}
+
+function usersFromJson(text) {
+  const map = new Map();
+  try { collectUsers(JSON.parse(text), map); } catch (e) { /* skip non-JSON */ }
+  return map;
+}
+
+// Parse the "Followers and following" section of HTML-format exports.
+function usersFromHtml(text) {
+  const map = new Map();
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  doc.querySelectorAll('a[href*="instagram.com/"]').forEach(a => {
+    const href = a.getAttribute("href") || "";
+    const m = href.match(/instagram\.com\/([^\/?#]+)/i);
+    const username = (a.textContent || (m && m[1]) || "").trim();
+    if (username && !/^https?:/i.test(username)) {
+      map.set(username.toLowerCase(), { username, href });
+    }
+  });
+  return map;
+}
+
+function mergeInto(target, src) { for (const [k, v] of src) if (!target.has(k)) target.set(k, v); }
+
+async function processExport(file) {
+  const followers = new Map();
+  const following = new Map();
+
+  const classify = (name, users) => {
+    // Classify by basename only — the parent dir "followers_and_following"
+    // contains both substrings and would misclassify the followers file.
+    const base = name.split("/").pop().toLowerCase();
+    if (!/follow/.test(base)) return;
+    if (/following/.test(base)) mergeInto(following, users);
+    else if (/follower/.test(base)) mergeInto(followers, users);
+  };
+
+  const name = file.name.toLowerCase();
+  const isSingleDoc = /\.(json|html?)$/.test(name);
+
+  if (isSingleDoc) {
+    // A single .json/.html file was chosen — guess which list by content.
+    const text = await file.text();
+    const users = /\.html?$/.test(name) ? usersFromHtml(text) : usersFromJson(text);
+    if (/following|relationships_following/.test(name) || /relationships_following/.test(text.slice(0, 500))) {
+      mergeInto(following, users);
+    } else {
+      mergeInto(followers, users);
+    }
+  } else {
+    // Treat as a ZIP (default for anything else, incl. iOS giving no extension).
+    setStatus("Reading ZIP index…");
+    const entries = await readCentralDirectory(file);
+    const relevant = entries.filter(e =>
+      /follow/i.test(e.name) && /\.(json|html?)$/i.test(e.name)
+    );
+    if (relevant.length === 0) {
+      throw new Error("Couldn't find followers/following files in this ZIP. Make sure it's an Instagram data export.");
+    }
+    setStatus("Extracting " + relevant.length + " file(s)…");
+    for (const e of relevant) {
+      const text = await extractEntryText(file, e);
+      const isHtml = /\.html?$/i.test(e.name);
+      classify(e.name, isHtml ? usersFromHtml(text) : usersFromJson(text));
+    }
+  }
+
+  return { followers, following };
+}
+
+// ---------- UI ----------
+const $ = sel => document.querySelector(sel);
+const statusEl = $("#status");
+let DATA = { notback: [], fans: [], mutual: [] };
+let currentTab = "notback";
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || "";
+  statusEl.classList.toggle("error", !!isError);
+}
+
+function compute(followers, following) {
+  const notback = [], fans = [], mutual = [];
+  for (const [k, v] of following) {
+    if (followers.has(k)) mutual.push(v); else notback.push(v);
+  }
+  for (const [k, v] of followers) {
+    if (!following.has(k)) fans.push(v);
+  }
+  const sort = arr => arr.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" }));
+  DATA = { notback: sort(notback), fans: sort(fans), mutual: sort(mutual) };
+
+  $("#cFollowing").textContent = following.size;
+  $("#cFollowers").textContent = followers.size;
+  $("#cNotBack").textContent = notback.length;
+  $("#cFans").textContent = fans.length;
+}
+
+function render() {
+  const list = $("#list");
+  const q = $("#search").value.trim().toLowerCase();
+  const rows = DATA[currentTab].filter(u => !q || u.username.toLowerCase().includes(q));
+  list.innerHTML = "";
+  $("#empty").classList.toggle("hidden", rows.length > 0);
+  for (const u of rows) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = u.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = "@" + u.username;
+    const open = document.createElement("a");
+    open.href = u.href; open.target = "_blank"; open.rel = "noopener noreferrer";
+    open.className = "open-link"; open.textContent = "Open ↗";
+    li.appendChild(a); li.appendChild(open);
+    list.appendChild(li);
+  }
+}
+
+function currentRows() {
+  const q = $("#search").value.trim().toLowerCase();
+  return DATA[currentTab].filter(u => !q || u.username.toLowerCase().includes(q));
+}
+
+async function handleFile(file) {
+  try {
+    if (typeof DecompressionStream === "undefined") {
+      throw new Error("Your browser is too old to read ZIP files here. Update iOS/Safari (16.4+) or Chrome, or unzip and drop following.json.");
+    }
+    setStatus("Reading " + file.name + " …");
+    const { followers, following } = await processExport(file);
+    if (following.size === 0 && followers.size === 0) {
+      throw new Error("No followers/following data found in this file.");
+    }
+    compute(followers, following);
+    render();
+    $("#results").classList.remove("hidden");
+    $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+    setStatus("Done. Parsed " + following.size + " following and " + followers.size + " followers.");
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || String(err), true);
+  }
+}
+
+// Drag & drop + file input
+const drop = $("#drop"), fileInput = $("#file");
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("dragover"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("dragover"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+
+// Tabs
+document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  currentTab = tab.dataset.tab;
+  render();
+}));
+
+$("#search").addEventListener("input", render);
+
+$("#copyBtn").addEventListener("click", async () => {
+  const text = currentRows().map(u => u.username).join("\n");
+  try { await navigator.clipboard.writeText(text); setStatus("Copied " + currentRows().length + " usernames."); }
+  catch { setStatus("Couldn't access clipboard.", true); }
+});
+
+$("#csvBtn").addEventListener("click", () => {
+  const rows = currentRows();
+  const csv = "username,profile_url\n" + rows.map(u => `${u.username},${u.href}`).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = currentTab + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("#resetBtn").addEventListener("click", () => {
+  $("#results").classList.add("hidden");
+  fileInput.value = "";
+  setStatus("");
+});
+</script>
+</body>
+</html>
