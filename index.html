@@ -114,6 +114,15 @@
     background: var(--card);
     color: var(--text);
   }
+  .toolbar select {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: .95rem;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+  }
   ul.list { list-style: none; padding: 0; margin: 0; }
   ul.list li {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -190,6 +199,12 @@
       </div>
       <div class="toolbar">
         <input type="search" id="search" placeholder="Filter usernames…" />
+        <select id="sort" aria-label="Sort order">
+          <option value="name-asc">Name A→Z</option>
+          <option value="name-desc">Name Z→A</option>
+          <option value="date-desc">Date: newest first</option>
+          <option value="date-asc">Date: oldest first</option>
+        </select>
         <button class="btn secondary" id="copyBtn">Copy list</button>
         <button class="btn secondary" id="csvBtn">Export CSV</button>
         <button class="btn secondary" id="resetBtn">Load another file</button>
@@ -433,6 +448,7 @@ const $ = sel => document.querySelector(sel);
 const statusEl = $("#status");
 let DATA = { notback: [], fans: [], mutual: [] };
 let currentTab = "notback";
+let currentSort = "name-asc";
 
 function setStatus(msg, isError) {
   statusEl.textContent = msg || "";
@@ -447,8 +463,7 @@ function compute(followers, following) {
   for (const [k, v] of followers) {
     if (!following.has(k)) fans.push(v);
   }
-  const sort = arr => arr.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" }));
-  DATA = { notback: sort(notback), fans: sort(fans), mutual: sort(mutual) };
+  DATA = { notback, fans, mutual }; // ordering is applied per-view in visibleRows()
 
   $("#cFollowing").textContent = following.size;
   $("#cFollowers").textContent = followers.size;
@@ -484,8 +499,7 @@ function metaText(u) {
 
 function render() {
   const list = $("#list");
-  const q = $("#search").value.trim().toLowerCase();
-  const rows = DATA[currentTab].filter(u => !q || u.username.toLowerCase().includes(q));
+  const rows = currentRows();
   list.innerHTML = "";
   $("#empty").classList.toggle("hidden", rows.length > 0);
   for (const u of rows) {
@@ -516,9 +530,28 @@ function render() {
   }
 }
 
+const byName = (a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" });
+function sortRows(rows) {
+  switch (currentSort) {
+    case "name-desc": return rows.sort((a, b) => byName(b, a));
+    // Unknown dates (ts 0) always sort to the bottom, then tie-break by name.
+    case "date-desc": return rows.sort((a, b) => (b.ts || 0) - (a.ts || 0) || byName(a, b));
+    case "date-asc": return rows.sort((a, b) => {
+      if (!a.ts && !b.ts) return byName(a, b);
+      if (!a.ts) return 1;
+      if (!b.ts) return -1;
+      return (a.ts - b.ts) || byName(a, b);
+    });
+    case "name-asc":
+    default: return rows.sort(byName);
+  }
+}
+
+// Rows for the current tab, filtered by the search box and ordered by the sort choice.
 function currentRows() {
   const q = $("#search").value.trim().toLowerCase();
-  return DATA[currentTab].filter(u => !q || u.username.toLowerCase().includes(q));
+  const rows = DATA[currentTab].filter(u => !q || u.username.toLowerCase().includes(q));
+  return sortRows(rows);
 }
 
 async function handleFile(file) {
@@ -558,6 +591,7 @@ document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", (
 }));
 
 $("#search").addEventListener("input", render);
+$("#sort").addEventListener("change", e => { currentSort = e.target.value; render(); });
 
 $("#copyBtn").addEventListener("click", async () => {
   const text = currentRows().map(u => u.username).join("\n");
