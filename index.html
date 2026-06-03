@@ -123,17 +123,32 @@
     color: var(--text);
     cursor: pointer;
   }
+  .progress {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-bottom: 10px; color: var(--muted); font-size: .85rem;
+  }
+  .linkbtn {
+    background: none; border: 0; color: var(--accent); cursor: pointer;
+    font-size: .85rem; padding: 0; font-weight: 600;
+  }
+  .linkbtn:hover { text-decoration: underline; }
   ul.list { list-style: none; padding: 0; margin: 0; }
   ul.list li {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    display: flex; align-items: center; gap: 12px;
     padding: 10px 4px;
     border-bottom: 1px solid var(--hair);
   }
   ul.list li:last-child { border-bottom: 0; }
-  ul.list .u { min-width: 0; }
+  ul.list .chk {
+    width: 20px; height: 20px; flex: 0 0 auto; cursor: pointer;
+    accent-color: var(--accent);
+  }
+  ul.list .u { flex: 1; min-width: 0; }
   ul.list a.name { color: var(--text); text-decoration: none; font-weight: 600; }
   ul.list a.name:hover { color: var(--accent); }
   ul.list .meta { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+  ul.list li.done .name { text-decoration: line-through; color: var(--muted); }
+  ul.list li.done { opacity: .55; }
   .open-link { color: var(--accent); font-size: .85rem; text-decoration: none; white-space: nowrap; }
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
   .tab {
@@ -208,6 +223,10 @@
         <button class="btn secondary" id="copyBtn">Copy list</button>
         <button class="btn secondary" id="csvBtn">Export CSV</button>
         <button class="btn secondary" id="resetBtn">Load another file</button>
+      </div>
+      <div class="progress hidden" id="progress">
+        <span id="progressText"></span>
+        <button class="linkbtn" id="clearDone" type="button">Clear checks</button>
       </div>
       <ul class="list" id="list"></ul>
       <div class="empty hidden" id="empty">Nothing here 🎉</div>
@@ -450,6 +469,17 @@ let DATA = { notback: [], fans: [], mutual: [] };
 let currentTab = "notback";
 let currentSort = "name-asc";
 
+// Usernames the user has manually ticked off (e.g. after unfollowing).
+// Persisted locally so a refresh doesn't lose progress; never uploaded.
+let DONE = new Set();
+const doneKey = u => u.username.toLowerCase();
+function loadDone() {
+  try { const a = JSON.parse(localStorage.getItem("doneUsers") || "[]"); if (Array.isArray(a)) DONE = new Set(a); } catch {}
+}
+function saveDone() {
+  try { localStorage.setItem("doneUsers", JSON.stringify([...DONE])); } catch {}
+}
+
 function setStatus(msg, isError) {
   statusEl.textContent = msg || "";
   statusEl.classList.toggle("error", !!isError);
@@ -503,7 +533,22 @@ function render() {
   list.innerHTML = "";
   $("#empty").classList.toggle("hidden", rows.length > 0);
   for (const u of rows) {
+    const key = doneKey(u);
     const li = document.createElement("li");
+    if (DONE.has(key)) li.classList.add("done");
+
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.className = "chk";
+    chk.checked = DONE.has(key);
+    chk.title = "Mark as handled (e.g. unfollowed)";
+    chk.setAttribute("aria-label", "Mark @" + u.username + " as handled");
+    chk.addEventListener("change", () => {
+      if (chk.checked) DONE.add(key); else DONE.delete(key);
+      li.classList.toggle("done", chk.checked);
+      saveDone();
+      updateProgress();
+    });
 
     const wrap = document.createElement("div");
     wrap.className = "u";
@@ -525,9 +570,21 @@ function render() {
     open.href = u.href; open.target = "_blank"; open.rel = "noopener noreferrer";
     open.className = "open-link"; open.textContent = "Open ↗";
 
-    li.appendChild(wrap); li.appendChild(open);
+    li.appendChild(chk); li.appendChild(wrap); li.appendChild(open);
     list.appendChild(li);
   }
+  updateProgress();
+}
+
+// "✓ 3 of 53 checked" for the current tab, with the Clear button shown when any are ticked.
+function updateProgress() {
+  const all = DATA[currentTab];
+  const total = all.length;
+  const done = all.reduce((n, u) => n + (DONE.has(doneKey(u)) ? 1 : 0), 0);
+  const box = $("#progress");
+  box.classList.toggle("hidden", total === 0);
+  $("#progressText").textContent = done ? `✓ ${done} of ${total} checked` : `0 of ${total} checked`;
+  $("#clearDone").classList.toggle("hidden", done === 0);
 }
 
 const byName = (a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" });
@@ -593,6 +650,16 @@ document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", (
 $("#search").addEventListener("input", render);
 $("#sort").addEventListener("change", e => { currentSort = e.target.value; render(); });
 
+$("#clearDone").addEventListener("click", () => {
+  const all = DATA[currentTab];
+  const done = all.filter(u => DONE.has(doneKey(u))).length;
+  if (!done) return;
+  if (!confirm(`Uncheck all ${done} checked accounts in this list?`)) return;
+  for (const u of all) DONE.delete(doneKey(u));
+  saveDone();
+  render();
+});
+
 $("#copyBtn").addEventListener("click", async () => {
   const text = currentRows().map(u => u.username).join("\n");
   try { await navigator.clipboard.writeText(text); setStatus("Copied " + currentRows().length + " usernames."); }
@@ -603,8 +670,8 @@ $("#csvBtn").addEventListener("click", () => {
   const rows = currentRows();
   const dateCol = currentTab === "fans" ? "followed_you_on" : "you_followed_on";
   const iso = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : "";
-  const csv = `username,profile_url,${dateCol}\n` +
-    rows.map(u => `${u.username},${u.href},${iso(u.ts)}`).join("\n");
+  const csv = `username,profile_url,${dateCol},checked\n` +
+    rows.map(u => `${u.username},${u.href},${iso(u.ts)},${DONE.has(doneKey(u)) ? "yes" : ""}`).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -652,6 +719,7 @@ if (window.matchMedia) {
   });
 }
 applySavedTheme();
+loadDone();
 </script>
 </body>
 </html>

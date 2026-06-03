@@ -54,9 +54,13 @@ Each row also shows **when the follow happened** (e.g. "you followed · 3y ago")
 taken from the export's own timestamp — handy for spotting old one-way follows
 of big accounts you're happy to just be a fan of.
 
-You can search/filter, **copy** the list, or **export CSV** (the CSV includes
-the follow date). The site has a **dark / light theme** that follows your device
-and can be toggled with the 🌙/☀️ button.
+You can search/filter, **sort** (name A→Z / Z→A, or follow-date newest/oldest),
+**copy** the list, or **export CSV** (the CSV includes the follow date and your
+checkmarks). Each row has a **checkbox** to tick off accounts as you handle them
+(e.g. after unfollowing) — your checks are saved locally in the browser so a
+refresh won't lose your progress, and a counter shows how many you've done. The
+site has a **dark / light theme** that follows your device and can be toggled
+with the 🌙/☀️ button.
 
 > Note: Instagram's export does **not** include follower counts for these
 > accounts (only usernames, profile links, and follow dates), so the tool can't
